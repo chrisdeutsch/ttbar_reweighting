@@ -30,7 +30,7 @@ def remove_duplicates(df):
 
 def apply_selection(df):
     sel = df.OS & (df.n_btag == 2) & (df.mBB > 150000)
-    sel = sel & (df.mTW > 50000.0)
+    sel = sel & (df.mTW > 40000.0)
     return df.loc[sel].copy()
 
 

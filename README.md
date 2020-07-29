@@ -25,5 +25,6 @@ fi
 
 
 # Ready to reweight
-reweight_nn.py /cephfs/user/s6crdeut/fr_ntups/ntups_v3
+cp -r /cephfs/user/s6crdeut/fr_ntups/ntups_v3 # cephfs is slooow
+reweight_nn.py ntups_v3
 ```
