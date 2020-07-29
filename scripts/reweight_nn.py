@@ -77,7 +77,7 @@ df_p1 = df_ttbar_nn
 
 # Definitions for training
 invars = ["njets_trafo", "HT_trafo", "lead_jet_pt_trafo"]
-epochs = 20
+epochs = 2
 batch_size = 256
 
 
@@ -155,3 +155,20 @@ for epoch in range(epochs):
     # Print out learning rate to get a feeling for the scheduler
     params, = optimizer.param_groups
     log.info("Epoch finished. Current LR: {}".format(params["lr"]))
+
+
+# Add scale factor to ttbar dataframe
+X = torch.tensor(df_ttbar_nn[invars].values, dtype=torch.float)
+pred = net(X).detach().numpy()
+df_ttbar["sf_nn"] = np.exp(pred) * (torch.sum(W0) / torch.sum(W1)).item()
+
+# Plot this puppy
+import matplotlib.pyplot as plt
+from ttbar_reweighting import Plotter, default_plots
+
+plotter = Plotter(df_data, df_ttbar, df_non_ttbar)
+
+for args in default_plots:
+    fig = plotter.plot(*args[1:], "sf_nn")
+    fig.savefig("{}_sf_nn.pdf".format(args[0]))
+    plt.close(fig)
