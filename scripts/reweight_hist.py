@@ -184,4 +184,15 @@ for name, sel in [("1p", lambda df: df.tau_prong == 1), ("3p", lambda df: df.tau
 
     del plotter
 
-# TODO: Plot ID region
+# Plot only ID region
+df_ttbar.weight *= df_ttbar.tauSF
+df_non_ttbar.weight *= df_non_ttbar.tauSF
+
+plotter = Plotter(df_data, df_ttbar, df_non_ttbar, sel=lambda df: df.tau_loose)
+for sf in scale_factors:
+    for args in default_plots:
+        fig = plotter.plot(*args[1:], sf)
+        fig.savefig("{}_{}_{}.pdf".format(args[0], sf, "idregion"))
+        plt.close(fig)
+
+del plotter

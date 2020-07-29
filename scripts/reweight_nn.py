@@ -77,7 +77,7 @@ df_p1 = df_ttbar_nn
 
 # Definitions for training
 invars = ["njets_trafo", "HT_trafo", "lead_jet_pt_trafo"]
-epochs = 2
+epochs = 100
 batch_size = 256
 
 
@@ -172,3 +172,16 @@ for args in default_plots:
     fig = plotter.plot(*args[1:], "sf_nn")
     fig.savefig("{}_sf_nn.pdf".format(args[0]))
     plt.close(fig)
+
+# Plot only ID region
+# Have to add tauSF back in (removed previously)
+df_ttbar.weight *= df_ttbar.tauSF
+df_non_ttbar.weight *= df_non_ttbar.tauSF
+
+plotter = Plotter(df_data, df_ttbar, df_non_ttbar, sel=lambda df: df.tau_loose)
+for args in default_plots:
+    fig = plotter.plot(*args[1:], "sf_nn")
+    fig.savefig("{}_sf_nn_{}.pdf".format(args[0], "idregion"))
+    plt.close(fig)
+
+del plotter
