@@ -17,7 +17,10 @@ default_plots = [
     ("ht", lambda df: df.HT / 1000.0, dict(bins=70, range=(100, 1500)), "$H_{T}$ [GeV]"),
     ("b0pt", lambda df: df.b0_pt / 1000.0, dict(bins=71, range=(45, 400)), "B0 $p_{T}$ [GeV]"),
     ("b1pt", lambda df: df.b1_pt / 1000.0, dict(bins=28, range=(20, 300)), "B1 $p_{T}$ [GeV]"),
-    ("jet0pt", lambda df: df.lead_jet_pt / 1000.0, dict(bins=71, range=(45, 400)), "Lead. jet $p_{T}$ [GeV]")
+    ("jet0pt", lambda df: df.lead_jet_pt / 1000.0, dict(bins=71, range=(45, 400)), "Lead. jet $p_{T}$ [GeV]"),
+    ("mbb", lambda df: df.mBB / 1000.0, dict(bins=65, range=(150, 800)), "$m_{bb}$ [GeV]"),
+    ("mhh", lambda df: df.mHH / 1000.0, dict(bins=65, range=(200, 1500)), "$m_{HH}$ [GeV]"),
+    ("drtaulep", lambda df: df.dRTauLep, dict(bins=50, range=(0, 5)), "$\Delta R(tau, lep)$")
 ]
 
 

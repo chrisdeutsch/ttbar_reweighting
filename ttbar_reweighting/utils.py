@@ -15,7 +15,7 @@ def get_dataframe(filename):
         "run_number", "event_number",
         "tau_pt", "tau_prong", "tau_loose",
         "lep_pt", "b0_pt", "b1_pt", "lead_jet_pt",
-        "mBB", "mTW", "MET", "HT"
+        "mBB", "mTW", "MET", "HT", "mHH", "dRTauLep"
     ]
 
     df = f["Nominal"].pandas.df(variables)
