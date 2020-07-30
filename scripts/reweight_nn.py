@@ -16,6 +16,8 @@ log = logging.getLogger("reweight_nn.py")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ntuple_dir")
+parser.add_argument("-o", "--outfile", default=None, help="File to store the trained model in [suffix: .pt or .pth]")
+parser.add_argument("--outfile-cpp", default=None, help="File to store the model in C++ format [suffix: .pt or .pth]")
 args = parser.parse_args()
 
 
@@ -156,6 +158,14 @@ for epoch in range(epochs):
     params, = optimizer.param_groups
     log.info("Epoch finished. Current LR: {}".format(params["lr"]))
 
+# Saving the model for python
+if args.outfile:
+    torch.save(net.state_dict(), args.outfile)
+
+# Saving the model for C++
+if args.outfile_cpp:
+    traced_script_module = torch.jit.trace(net, torch.rand(1, len(invars)))
+    traced_script_module.save(args.outfile_cpp)
 
 # Add scale factor to ttbar dataframe
 X = torch.tensor(df_ttbar_nn[invars].values, dtype=torch.float)
