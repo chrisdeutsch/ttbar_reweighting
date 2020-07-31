@@ -13,8 +13,12 @@ import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ntuple_dir")
-parser.add_argument("-o", "--outfile", default=None,
-                    help="File to store the trained model in [suffix: .pt or .pth]")
+parser.add_argument("--outfile-model", default=None,
+                    help="File to store the trained model in [extension: .pt or .pth]")
+parser.add_argument("--outfile-preprocessing", default=None,
+                    help="File to store the preprocessing factors [extension: .npz]")
+parser.add_argument("--load-preprocessing", default=None,
+                    help="Load preprocessing instead of deriving")
 parser.add_argument("--load-model", default=None,
                     help="Load model instead of training")
 
@@ -96,9 +100,20 @@ invars = args.invars
 
 # Preprocessing
 # To scale inputs by (x - median) / IQR and apply the top cutoff (given by denominator of density ratio)
-offset = df_p1[invars].quantile(0.5).values.astype(np.float32)
-scale = (df_p1[invars].quantile(0.75) - df_p1[invars].quantile(0.25)).values.astype(np.float32)
-cutoff = df_p1[invars].quantile(0.99).values.astype(np.float32)
+if args.load_preprocessing:
+    f = np.load(args.load_preprocessing)
+    offset = f["offset"]
+    scale = f["scale"]
+    cutoff = f["cutoff"]
+else:
+    offset = df_p1[invars].quantile(0.5).values.astype(np.float32)
+    scale = (df_p1[invars].quantile(0.75) - df_p1[invars].quantile(0.25)).values.astype(np.float32)
+    cutoff = df_p1[invars].quantile(0.99).values.astype(np.float32)
+
+# Save preprocessing
+if args.outfile_preprocessing:
+    with open(args.outfile_preprocessing, "wb") as f:
+        np.savez(f, offset=offset, scale=scale, cutoff=cutoff)
 
 # Some pytorch action!
 import torch
@@ -153,8 +168,8 @@ if not args.load_model:
           weight_decay=args.weight_decay)
 
     # Saving the model for python
-    if args.outfile:
-        torch.save(net.state_dict(), args.outfile)
+    if args.outfile_model:
+        torch.save(net.state_dict(), args.outfile_model)
 else:
     net.load_state_dict(torch.load(args.load_model))
 
