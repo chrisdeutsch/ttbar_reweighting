@@ -177,6 +177,18 @@ for args in default_plots:
     fig.savefig("{}_sf_nn.pdf".format(args[0]))
     plt.close(fig)
 
+del plotter
+
+# Split in 1-prong / 3-prong
+for prong in [1, 3]:
+    plotter = Plotter(df_data, df_ttbar, df_non_ttbar, sel=lambda df: df.tau_prong == prong)
+    for args in default_plots:
+        if args[0] != "taupt":
+            continue
+
+        fig = plotter.plot(*args[1:], "sf_nn")
+        fig.savefig("{}_{}p_sf_nn.pdf".format(args[0], prong))
+
 # Plot only ID region
 # Have to add tauSF back in (removed previously)
 df_ttbar.weight *= df_ttbar.tauSF
