@@ -16,8 +16,21 @@ log = logging.getLogger("reweight_nn.py")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ntuple_dir")
-parser.add_argument("-o", "--outfile", default=None, help="File to store the trained model in [suffix: .pt or .pth]")
-parser.add_argument("--outfile-cpp", default=None, help="File to store the model in C++ format [suffix: .pt or .pth]")
+parser.add_argument("-o", "--outfile", default=None,
+                    help="File to store the trained model in [suffix: .pt or .pth]")
+parser.add_argument("--load-model", default=None,
+                    help="Load model instead of training")
+
+parser.add_argument("--invars", nargs="+", default=["n_jets", "HT", "lead_jet_pt"])
+parser.add_argument("--epochs", default=100, type=int,
+                    help="Number of epochs. The epoch is defined as a single pass through the smallest dataset.")
+parser.add_argument("--clip-grad-value", default=None, type=float)
+
+# Sampling options
+parser.add_argument("--batch-size", default=256, type=int,
+                    help="Size of the batches sampled from each sample "
+                    "(i.e. a single batch in training is twice this size)")
+
 args = parser.parse_args()
 
 
@@ -65,30 +78,23 @@ df_non_ttbar_nn = df_non_ttbar.copy()
 df_non_ttbar_nn.weight *= -1.0 # Need to subtract non ttbar from data
 
 for df in [df_data_nn, df_non_ttbar_nn, df_ttbar_nn]:
-    df["njets_trafo"] = (np.clip(df.n_jets, 2, 10) - 2) / 8.0
-
-    q_lo, med, q_hi = df_ttbar_nn.HT.quantile([0.25, 0.5, 0.75])
-    df["HT_trafo"] = (df.HT - med) / (q_hi - q_lo)
-
-    q_lo, med, q_hi = df_ttbar_nn.lead_jet_pt.quantile([0.25, 0.5, 0.75])
-    df["lead_jet_pt_trafo"] = (df.lead_jet_pt - med) / (q_hi - q_lo)
+    df["HT_tau"] = df.HT + df.tau_pt
 
 # Pseudo-datasets
 df_p0 = pd.concat([df_data_nn, df_non_ttbar_nn])
 df_p1 = df_ttbar_nn
 
-# Definitions for training
-invars = ["njets_trafo", "HT_trafo", "lead_jet_pt_trafo"]
-epochs = 100
-batch_size = 256
+invars = args.invars
 
+# To scale inputs by (x - median) / IQR
+offset = df_p1[invars].quantile(0.5).values.astype(np.float32)
+scale = (df_p1[invars].quantile(0.75) - df_p1[invars].quantile(0.25)).values.astype(np.float32)
 
 # Some pytorch action!
 import torch
-import torch.optim as optim
 from torch.utils.data import TensorDataset, WeightedRandomSampler, DataLoader
 
-from ttbar_reweighting import ReweightingNet
+from ttbar_reweighting import ReweightingNet, train
 
 # Reproducibility
 torch.manual_seed(0)
@@ -96,6 +102,10 @@ torch.manual_seed(0)
 # Input variables
 X0 = torch.Tensor(df_p0[invars].values).float()
 X1 = torch.Tensor(df_p1[invars].values).float()
+
+# Transform inputs
+X0 = (X0 - offset) / scale
+X1 = (X1 - offset) / scale
 
 # Weights
 W0 = torch.Tensor(df_p0.weight.values[:, np.newaxis]).float()
@@ -108,67 +118,28 @@ dataset1 = TensorDataset(X1, torch.sign(W1))
 
 min_dataset_len = min(len(dataset0), len(dataset1))
 
-# Replacement=false?
-sampler0 = WeightedRandomSampler(torch.abs(W0.view(-1)), min_dataset_len)
-sampler1 = WeightedRandomSampler(torch.abs(W1.view(-1)), min_dataset_len)
+sampler0 = WeightedRandomSampler(torch.abs(W0.view(-1)), min_dataset_len, replacement=True)
+sampler1 = WeightedRandomSampler(torch.abs(W1.view(-1)), min_dataset_len, replacement=True)
 
-loader0 = DataLoader(dataset0, batch_size=batch_size, sampler=sampler0, num_workers=1)
-loader1 = DataLoader(dataset1, batch_size=batch_size, sampler=sampler1, num_workers=1)
+loader0 = DataLoader(dataset0, batch_size=args.batch_size, sampler=sampler0, num_workers=1)
+loader1 = DataLoader(dataset1, batch_size=args.batch_size, sampler=sampler1, num_workers=1)
 
-net = ReweightingNet(len(invars))
-optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9)
-scheduler = optim.lr_scheduler.MultiplicativeLR(optimizer, lambda i: 0.95)
+net = ReweightingNet(len(invars), leak=0.01)
 
-for epoch in range(epochs):
-    running_loss = 0.0
+if not args.load_model:
+    train(net, loader0, loader1, epochs=args.epochs, clip_grad_value=args.clip_grad_value)
 
-    for i, (data0, data1) in enumerate(zip(loader0, loader1)):
-        if i % 1000 == 999:
-            log.info("[{} {}]: {:.5f}".format(epoch + 1, i + 1, running_loss / 1000))
-            running_loss = 0.0
+    # Saving the model for python
+    if args.outfile:
+        torch.save(net.state_dict(), args.outfile)
+else:
+    net.load_state_dict(torch.load(args.load_model))
 
-        x0, w0 = data0
-        x1, w1 = data1
-
-        if torch.sum(w0) <= 0 or torch.sum(w1) <= 0:
-            log.warning("Skipping bad batch...")
-            log.warning("sum(w0) = {}".format(torch.sum(w0).item()))
-            log.warning("sum(w1) = {}".format(torch.sum(w1).item()))
-            log.warning("This should not occur often. If it does it will likely introduce a bias.")
-            continue
-
-        optimizer.zero_grad()
-
-        pred0, pred1 = net(x0), net(x1)
-
-        loss = torch.sum(w0 / torch.sqrt(torch.exp(pred0))) / torch.sum(w0) \
-             + torch.sum(w1 * torch.sqrt(torch.exp(pred1))) / torch.sum(w1)
-
-        if torch.isnan(loss) or torch.isinf(loss):
-            log.error("Loss is nan or inf. Aborting...")
-            sys.exit(1)
-
-        running_loss += loss.item()
-        loss.backward()
-        optimizer.step()
-
-    scheduler.step()
-
-    # Print out learning rate to get a feeling for the scheduler
-    params, = optimizer.param_groups
-    log.info("Epoch finished. Current LR: {}".format(params["lr"]))
-
-# Saving the model for python
-if args.outfile:
-    torch.save(net.state_dict(), args.outfile)
-
-# Saving the model for C++
-if args.outfile_cpp:
-    traced_script_module = torch.jit.trace(net, torch.rand(1, len(invars)))
-    traced_script_module.save(args.outfile_cpp)
+# Turn on evaluation mode
+net.eval()
 
 # Add scale factor to ttbar dataframe
-X = torch.tensor(df_ttbar_nn[invars].values, dtype=torch.float)
+X = torch.tensor((df_ttbar_nn[invars].values - offset) / scale, dtype=torch.float)
 pred = net(X).detach().numpy()
 df_ttbar["sf_nn"] = np.exp(pred) * (torch.sum(W0) / torch.sum(W1)).item()
 
