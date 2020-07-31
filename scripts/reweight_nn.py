@@ -25,6 +25,7 @@ parser.add_argument("--invars", nargs="+", default=["n_jets", "HT", "lead_jet_pt
 parser.add_argument("--epochs", default=100, type=int,
                     help="Number of epochs. The epoch is defined as a single pass through the smallest dataset.")
 parser.add_argument("--clip-grad-value", default=None, type=float)
+parser.add_argument("--weight-decay", default=0, type=float)
 
 # Sampling options
 parser.add_argument("--batch-size", default=256, type=int,
@@ -127,7 +128,10 @@ loader1 = DataLoader(dataset1, batch_size=args.batch_size, sampler=sampler1, num
 net = ReweightingNet(len(invars), leak=0.01)
 
 if not args.load_model:
-    train(net, loader0, loader1, epochs=args.epochs, clip_grad_value=args.clip_grad_value)
+    train(net, loader0, loader1,
+          epochs=args.epochs,
+          clip_grad_value=args.clip_grad_value,
+          weight_decay=args.weight_decay)
 
     # Saving the model for python
     if args.outfile:

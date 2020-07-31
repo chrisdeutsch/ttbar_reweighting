@@ -39,8 +39,9 @@ def train(model, loader0, loader1, **kwargs):
     momentum = kwargs.get("momentum", 0.9)
     lr_schedule_factor = kwargs.get("lr_schedule_factor", 0.95)
     clip_grad_value = kwargs.get("clip_grad_value", None)
+    weight_decay = kwargs.get("weight_decay", 0)
 
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.MultiplicativeLR(optimizer, lambda i: lr_schedule_factor)
 
     log.info("Starting training...")
@@ -49,6 +50,7 @@ def train(model, loader0, loader1, **kwargs):
     log.info("Momentum: " + str(momentum))
     log.info("LR schedule factor: " + str(lr_schedule_factor))
     log.info("Gradient value clipping: " + str(clip_grad_value))
+    log.info("Weight decay (L2 reg.): " + str(weight_decay))
 
     for epoch in range(epochs):
         # Running average of loss
