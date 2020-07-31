@@ -11,9 +11,6 @@ import numpy as np
 import pandas as pd
 
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("reweight_nn.py")
-
 parser = argparse.ArgumentParser()
 parser.add_argument("ntuple_dir")
 parser.add_argument("-o", "--outfile", default=None,
@@ -32,7 +29,17 @@ parser.add_argument("--batch-size", default=256, type=int,
                     help="Size of the batches sampled from each sample "
                     "(i.e. a single batch in training is twice this size)")
 
+parser.add_argument("--debug", action="store_true")
+
 args = parser.parse_args()
+
+
+level = logging.INFO
+if args.debug:
+    level = logging.DEBUG
+
+logging.basicConfig(level=level)
+log = logging.getLogger("reweight_nn.py")
 
 
 # Load ntuples
@@ -87,15 +94,25 @@ df_p1 = df_ttbar_nn
 
 invars = args.invars
 
-# To scale inputs by (x - median) / IQR
+# Preprocessing
+# To scale inputs by (x - median) / IQR and apply the top cutoff (given by denominator of density ratio)
 offset = df_p1[invars].quantile(0.5).values.astype(np.float32)
 scale = (df_p1[invars].quantile(0.75) - df_p1[invars].quantile(0.25)).values.astype(np.float32)
+cutoff = df_p1[invars].quantile(0.99).values.astype(np.float32)
 
 # Some pytorch action!
 import torch
 from torch.utils.data import TensorDataset, WeightedRandomSampler, DataLoader
 
+import ttbar_reweighting.nn
 from ttbar_reweighting import ReweightingNet, train
+
+
+# To find weird things happening
+if args.debug:
+    log.info("Setting autograd anomaly detection")
+    torch.autograd.set_detect_anomaly(True)
+    ttbar_reweighting.nn.log.setLevel(logging.DEBUG)
 
 # Reproducibility
 torch.manual_seed(0)
@@ -105,6 +122,8 @@ X0 = torch.Tensor(df_p0[invars].values).float()
 X1 = torch.Tensor(df_p1[invars].values).float()
 
 # Transform inputs
+X0 = torch.min(X0, torch.Tensor(cutoff))
+X1 = torch.min(X1, torch.Tensor(cutoff))
 X0 = (X0 - offset) / scale
 X1 = (X1 - offset) / scale
 

@@ -58,8 +58,8 @@ def train(model, loader0, loader1, **kwargs):
         running_loss_cnt = 0
 
         for i, (data0, data1) in enumerate(zip(loader0, loader1)):
-            if i % 1000 == 999:
-                log.info("[{} {}]: {:.5f}".format(epoch + 1, i + 1, running_loss / running_loss_cnt))
+            if i % 100 == 99:
+                log.info("[{} {}]: Avg. loss = {:.5f}".format(epoch + 1, i + 1, running_loss / running_loss_cnt))
                 running_loss = 0.0
                 running_loss_cnt = 0
 
@@ -77,8 +77,24 @@ def train(model, loader0, loader1, **kwargs):
 
             pred0, pred1 = model(x0), model(x1)
 
-            loss = torch.sum(w0 / torch.sqrt(torch.exp(pred0))) / torch.sum(w0) \
-                + torch.sum(w1 * torch.sqrt(torch.exp(pred1))) / torch.sum(w1)
+            loss_term1 = torch.sum(w0 / torch.sqrt(torch.exp(pred0))) / torch.sum(w0)
+            loss_term2 = torch.sum(w1 * torch.sqrt(torch.exp(pred1))) / torch.sum(w1)
+
+            if loss_term1 < 0:
+                log.warning("Loss term 1 is negative. Clipping at 0...")
+                loss_term1 = torch.max(loss_term1, torch.zeros(1))
+
+            if loss_term2 < 0:
+                log.warning("Loss term 2 is negative. Clipping at 0...")
+                loss_term1 = torch.max(loss_term2, torch.zeros(1))
+
+            loss = loss_term1 + loss_term2
+            log.debug("[{} {}]: Loss = {:.5f}".format(epoch + 1, i + 1, loss))
+
+            if loss < 0:
+                log.error("Loss is negative")
+                import pdb;pdb.set_trace()
+                sys.exit(1)
 
             if torch.isnan(loss) or torch.isinf(loss):
                 log.error("Loss is nan or inf. Aborting...")
@@ -90,6 +106,7 @@ def train(model, loader0, loader1, **kwargs):
                 log.info(torch.sum(w0))
                 log.info("sum w1")
                 log.info(torch.sum(w1))
+                import pdb; pdb.set_trace()
                 sys.exit(1)
 
             running_loss += loss.item()
