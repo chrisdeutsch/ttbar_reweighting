@@ -81,6 +81,10 @@ df_data = dfs["data"]
 df_ttbar = dfs["ttbarIncl"]
 df_non_ttbar = pd.concat([dfs[sample] for sample in dfs if sample !="data" and sample != "ttbarIncl"])
 
+# Add new variables
+for df in [df_data, df_ttbar, df_non_ttbar]:
+    df["HT_tau"] = df.HT + df.tau_pt
+
 # Want to estimate the density ratio: f_0(x) / f_1(x) = f_(data - non_ttbar)(x) / f_(ttbar)(x)
 # Therefore need to build pseudodataset from data - non_ttbar
 # First augment with additional info for training
@@ -88,9 +92,6 @@ df_ttbar_nn = df_ttbar.copy()
 df_data_nn = df_data.copy()
 df_non_ttbar_nn = df_non_ttbar.copy()
 df_non_ttbar_nn.weight *= -1.0 # Need to subtract non ttbar from data
-
-for df in [df_data_nn, df_non_ttbar_nn, df_ttbar_nn]:
-    df["HT_tau"] = df.HT + df.tau_pt
 
 # Pseudo-datasets
 df_p0 = pd.concat([df_data_nn, df_non_ttbar_nn])
@@ -121,7 +122,6 @@ from torch.utils.data import TensorDataset, WeightedRandomSampler, DataLoader
 
 import ttbar_reweighting.nn
 from ttbar_reweighting import ReweightingNet, train
-
 
 # To find weird things happening
 if args.debug:
@@ -176,10 +176,21 @@ else:
 # Turn on evaluation mode
 net.eval()
 
+# Add NN to dataframes
+for df in [df_data, df_ttbar, df_non_ttbar, df_p0, df_p1]:
+    X = torch.Tensor(df[invars].values).float()
+    X = torch.min(X, torch.Tensor(cutoff))
+    X = (X - offset) / scale
+    pred = net(X).detach().numpy()
+    df["nn"] = pred
+
+# Evaluate loss:
+loss = np.sum(df_p0.weight / np.sqrt(np.exp(df_p0.nn))) / np.sum(df_p0.weight) \
+     + np.sum(df_p1.weight * np.sqrt(np.exp(df_p1.nn))) / np.sum(df_p1.weight)
+log.info("Final loss averaged over the entire training dataset: {:.6f}".format(loss))
+
 # Add scale factor to ttbar dataframe
-X = torch.tensor((df_ttbar_nn[invars].values - offset) / scale, dtype=torch.float)
-pred = net(X).detach().numpy()
-df_ttbar["sf_nn"] = np.exp(pred) * (torch.sum(W0) / torch.sum(W1)).item()
+df_ttbar["sf_nn"] = np.exp(df_ttbar.nn) * (torch.sum(W0) / torch.sum(W1)).item()
 
 # Plot this puppy
 import matplotlib.pyplot as plt
