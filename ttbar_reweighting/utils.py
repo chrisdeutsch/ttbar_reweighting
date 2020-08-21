@@ -15,7 +15,8 @@ def get_dataframe(filename):
         "run_number", "event_number",
         "tau_pt", "tau_prong", "tau_loose",
         "lep_pt", "b0_pt", "b1_pt", "lead_jet_pt",
-        "mBB", "mTW", "MET", "HT", "mHH", "dRTauLep"
+        "mBB", "mTW", "MET", "HT", "mHH", "dRTauLep", "dRBB",
+        "pTBB", "pTHH", "pTTauTau", "pTTauLep", "minDRbl", "minDRbtau"
     ]
 
     df = f["Nominal"].pandas.df(variables)
@@ -28,9 +29,24 @@ def remove_duplicates(df):
     return df.loc[~(dupe_mask & ~df.tau_loose)], (dupe_mask & ~df.tau_loose).sum()
 
 
-def apply_selection(df):
-    sel = df.OS & (df.n_btag == 2) & (df.mBB > 150000)
-    sel = sel & (df.mTW > 40000.0)
+def apply_selection(df, region="FR"):
+    sel = df.OS & (df.n_btag == 2)
+
+    if region == "FR":
+        sel = sel & (df.mBB > 150000.0)
+        sel = sel & (df.mTW > 40000.0)
+    elif region == "FR_Bowen":
+        sel = sel & (df.mBB > 50000.0) & ((df.mBB > 150000.0) | (df.mBB < 100000.0))
+        sel = sel & (df.mTW > 60000.0)
+    elif region == "VR1":
+        sel = sel & (df.mBB <= 150000.0)
+        sel = sel & (df.mTW > 60000.0)
+    elif region == "VR2":
+        sel = sel & (df.mBB > 150000.0)
+        sel = sel & (df.mTW > 150000.0)
+    else:
+        raise RuntimeError("Unknown selection")
+
     return df.loc[sel].copy()
 
 

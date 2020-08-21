@@ -7,20 +7,47 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("ttbar_reweighting.plotting")
 
 
+def plot_loss(train_loss, test_loss, outfile="loss.pdf"):
+    fig, ax = plt.subplots()
+
+    x_train = 1 + np.arange(len(train_loss))
+    x_test = 1 + np.arange(len(test_loss))
+    y_train = np.array(train_loss)
+    y_test = np.array(test_loss)
+
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+
+    ax.plot(x_train, y_train, c="r", label="Training")
+    ax.plot(x_test, y_test, c="b", label="Testing")
+    ax.legend()
+
+    fig.savefig(outfile)
+    plt.close(fig)
+
+
 # See also Plotter.plot
 default_plots = [
-    ("taupt", lambda df: df.tau_pt / 1000.0, dict(bins=40, range=(20, 200)), "Tau candidate $p_{T}$ [GeV]"),
-    ("leppt", lambda df: df.lep_pt / 1000.0, dict(bins=45, range=(25, 250)), "Lepton $p_{T}$ [GeV]"),
-    ("mtw", lambda df: df.mTW / 1000.0, dict(bins=40, range=(0, 200)), "$m_{T,W}$ [GeV]"),
-    ("met", lambda df: df.MET / 1000.0, dict(bins=40, range=(0, 500)), "MET [GeV]"),
+    ("taupt", lambda df: df.tau_pt / 1000.0, dict(bins=36, range=(20, 200)), "Tau candidate $p_{T}$ [GeV]"),
+    ("leppt", lambda df: df.lep_pt / 1000.0, dict(bins=36, range=(20, 200)), "Lepton $p_{T}$ [GeV]"),
+    ("mtw", lambda df: df.mTW / 1000.0, dict(bins=25, range=(0, 250)), "$m_{T,W}$ [GeV]"),
+    ("met", lambda df: df.MET / 1000.0, dict(bins=20, range=(0, 400)), "MET [GeV]"),
     ("njets", lambda df: np.clip(df.n_jets, 0, 12), dict(bins=np.arange(2, 13)), "$N_{jets}$"),
-    ("ht", lambda df: df.HT / 1000.0, dict(bins=70, range=(100, 1500)), "$H_{T}$ [GeV]"),
-    ("b0pt", lambda df: df.b0_pt / 1000.0, dict(bins=71, range=(45, 400)), "B0 $p_{T}$ [GeV]"),
-    ("b1pt", lambda df: df.b1_pt / 1000.0, dict(bins=28, range=(20, 300)), "B1 $p_{T}$ [GeV]"),
+    ("ht", lambda df: df.HT / 1000.0, dict(bins=40, range=(0, 2000)), "$H_{T}$ [GeV]"),
+    ("b0pt", lambda df: df.b0_pt / 1000.0, dict(bins=41, range=(45, 250)), "B0 $p_{T}$ [GeV]"),
+    ("b1pt", lambda df: df.b1_pt / 1000.0, dict(bins=36, range=(20, 200)), "B1 $p_{T}$ [GeV]"),
     ("jet0pt", lambda df: df.lead_jet_pt / 1000.0, dict(bins=71, range=(45, 400)), "Lead. jet $p_{T}$ [GeV]"),
-    ("mbb", lambda df: df.mBB / 1000.0, dict(bins=65, range=(150, 800)), "$m_{bb}$ [GeV]"),
-    ("mhh", lambda df: df.mHH / 1000.0, dict(bins=65, range=(200, 1500)), "$m_{HH}$ [GeV]"),
-    ("drtaulep", lambda df: df.dRTauLep, dict(bins=50, range=(0, 5)), "$\Delta R(tau, lep)$")
+    ("mbb", lambda df: df.mBB / 1000.0, dict(bins=25, range=(150, 650)), "$m_{bb}$ [GeV]"),
+    ("mbblow", lambda df: df.mBB / 1000.0, dict(bins=30, range=(0, 150)), "$m_{bb}$ [GeV]"),
+    ("mhh", lambda df: df.mHH / 1000.0, dict(bins=36, range=(200, 2000)), "$m_{HH}$ [GeV]"),
+    ("drtaulep", lambda df: df.dRTauLep, dict(bins=36, range=(0, 6)), "$\Delta R(tau, lep)$"),
+    ("drbb", lambda df: df.dRBB, dict(bins=36, range=(0, 6)), "$\Delta R(b, b)$"),
+    ("mindrbl", lambda df: df.minDRbl, dict(bins=36, range=(0, 6)), "$min \Delta R(b, l)$"),
+    ("mindrbtau", lambda df: df.minDRbtau, dict(bins=36, range=(0, 6)), "$min \Delta R(b, tau)$"),
+    ("ptbb", lambda df: df.pTBB / 1000.0, dict(bins=40, range=(0, 400)), "$p_{T, bb}$ [GeV]"),
+    ("pthh", lambda df: df.pTHH / 1000.0, dict(bins=50, range=(0, 500)), "$p_{T, hh}$ [GeV]"),
+    ("pttautau", lambda df: df.pTTauTau / 1000.0, dict(bins=40, range=(0, 400)), "$p_{T, tautau}$ [GeV]"),
+    ("pttaulep", lambda df: df.pTTauLep / 1000.0, dict(bins=40, range=(0, 400)), "$p_{T, taulep}$ [GeV]"),
 ]
 
 

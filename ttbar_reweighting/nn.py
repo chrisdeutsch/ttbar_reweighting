@@ -11,26 +11,27 @@ log = logging.getLogger("ttbar_reweighting.nn")
 
 
 class ReweightingNet(nn.Module):
-    def __init__(self, num_inputs, leak=0.1):
+    def __init__(self, num_inputs, hidden_layers=[32, 32, 32, 32, 32], leak=0.1):
         super(ReweightingNet, self).__init__()
 
         # Size of the leak in leaky relu
         self.leak = leak
 
-        self.fc1 = nn.Linear(num_inputs, 32)
-        self.fc2 = nn.Linear(32, 32)
-        self.fc3 = nn.Linear(32, 32)
-        self.fc4 = nn.Linear(32, 32)
-        self.fc5 = nn.Linear(32, 32)
-        self.fc6 = nn.Linear(32, 1)
+        # Build the network
+        nodes = [num_inputs] + hidden_layers + [1]
+
+        self.layers = []
+        for i, j in zip(nodes, nodes[1:]):
+            self.layers.append(nn.Linear(i, j))
+
+        # Register layers (needed so that pytorch knows about these layers)
+        for i, layer in enumerate(self.layers):
+            setattr(self, "fc{}".format(i), layer)
 
     def forward(self, x):
-        x = F.leaky_relu(self.fc1(x), self.leak)
-        x = F.leaky_relu(self.fc2(x), self.leak)
-        x = F.leaky_relu(self.fc3(x), self.leak)
-        x = F.leaky_relu(self.fc4(x), self.leak)
-        x = F.leaky_relu(self.fc5(x), self.leak)
-        return self.fc6(x)
+        for layer in self.layers[:-1]:
+            x = F.leaky_relu(layer(x), self.leak)
+        return self.layers[-1](x)
 
 
 def train(model, loader0, loader1, **kwargs):
@@ -40,6 +41,8 @@ def train(model, loader0, loader1, **kwargs):
     lr_schedule_factor = kwargs.get("lr_schedule_factor", 0.95)
     clip_grad_value = kwargs.get("clip_grad_value", None)
     weight_decay = kwargs.get("weight_decay", 0)
+    train_monitor = kwargs.get("train_monitor", None)
+    test_monitor = kwargs.get("test_monitor", None)
 
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.MultiplicativeLR(optimizer, lambda i: lr_schedule_factor)
@@ -52,11 +55,15 @@ def train(model, loader0, loader1, **kwargs):
     log.info("Gradient value clipping: " + str(clip_grad_value))
     log.info("Weight decay (L2 reg.): " + str(weight_decay))
 
+    loss_train = []
+    loss_test = []
+
     for epoch in range(epochs):
         # Running average of loss
         running_loss = 0.0
         running_loss_cnt = 0
 
+        model.train()
         for i, (data0, data1) in enumerate(zip(loader0, loader1)):
             if i % 100 == 99:
                 log.info("[{} {}]: Avg. loss = {:.5f}".format(epoch + 1, i + 1, running_loss / running_loss_cnt))
@@ -122,3 +129,29 @@ def train(model, loader0, loader1, **kwargs):
         # Print out learning rate to get a feeling for the scheduler
         params, = optimizer.param_groups
         log.info("Epoch finished. Current LR: {}".format(params["lr"]))
+
+        # Monitor loss
+        monitor = []
+        if train_monitor:
+            monitor.append(("Training", train_monitor))
+        if test_monitor:
+            monitor.append(("Testing", test_monitor))
+
+        for label, (X0, W0, X1, W1) in monitor:
+            model.eval()
+            with torch.no_grad():
+                pred0 = model(X0)
+                pred1 = model(X1)
+                l = torch.sum(W0 / torch.sqrt(torch.exp(pred0))) / torch.sum(W0) \
+                    + torch.sum(W1 * torch.sqrt(torch.exp(pred1))) / torch.sum(W1)
+
+            log.info("{} loss after epoch {}: {:.6f}".format(label, epoch + 1, l))
+
+            if label == "Training":
+                loss_train.append(l.item())
+            if label == "Testing":
+                loss_test.append(l.item())
+
+            model.train()
+
+    return loss_train, loss_test
