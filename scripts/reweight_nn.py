@@ -10,6 +10,7 @@ from ttbar_reweighting import Plotter, default_plots, plot_loss
 
 import numpy as np
 import pandas as pd
+from scipy.stats import poisson
 
 
 parser = argparse.ArgumentParser()
@@ -46,6 +47,11 @@ parser.add_argument("--fold", default=0, type=int,
 # Network options
 parser.add_argument("--layers", nargs="+", default=[32, 32, 32, 32, 32], type=int,
                     help="Number of nodes in the hidden layers of the network")
+
+
+# Poisson bootstrap
+parser.add_argument("--bootstrap-seed", default=None, type=int)
+
 
 args = parser.parse_args()
 
@@ -96,6 +102,17 @@ df_non_ttbar = pd.concat([dfs[sample] for sample in dfs if sample !="data" and s
 # Add new variables
 for df in [df_data, df_ttbar, df_non_ttbar]:
     df["HT_tau"] = df.HT + df.tau_pt
+
+# Adding poisson weight
+if args.bootstrap_seed:
+    log.info("Poisson bootstrap with seed: " + repr(args.bootstrap_seed))
+    for i, df in enumerate([df_data, df_ttbar, df_non_ttbar]):
+        seed = i * (args.bootstrap_seed + 10)
+
+        bootstrap_weights = poisson.rvs(1, size=len(df), random_state=seed).astype(np.float32)
+        bootstrap_weights *= len(df) / bootstrap_weights.sum()
+
+        df["weight"] *= bootstrap_weights
 
 # Want to estimate the density ratio: f_0(x) / f_1(x) = f_(data - non_ttbar)(x) / f_(ttbar)(x)
 # Therefore need to build pseudodataset from data - non_ttbar
