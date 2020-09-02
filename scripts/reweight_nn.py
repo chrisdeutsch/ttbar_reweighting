@@ -135,19 +135,28 @@ if args.load_preprocessing:
     f = np.load(args.load_preprocessing)
     offset = f["offset"]
     scale = f["scale"]
-    cutoff = f["cutoff"]
+    top_cutoff = f["top_cutoff"]
+    bot_cutoff = f["bot_cutoff"]
     norm_factor = f["norm_factor"]
 else:
     offset = df_p1[invars].quantile(0.5).values.astype(np.float32)
     scale = (df_p1[invars].quantile(0.75) - df_p1[invars].quantile(0.25)).values.astype(np.float32)
-    cutoff = df_p1[invars].quantile(0.99).values.astype(np.float32)
+    top_cutoff = df_p1[invars].quantile(0.99).values.astype(np.float32)
+    bot_cutoff = df_p1[invars].quantile(0.01).values.astype(np.float32)
     norm_factor = df_p0.weight.sum() / df_p1.weight.sum()
+
+    log.info("=== Preprocessing summary ===")
+    log.info("Offset: " + repr(offset))
+    log.info("Scale: " + repr(scale))
+    log.info("Top cutoff: " + repr(top_cutoff))
+    log.info("Bottom cutoff: " + repr(bot_cutoff))
+    log.info("Norm factor: " + repr(norm_factor))
 
 # Save preprocessing
 if args.outfile_preprocessing:
     log.info("Saving preprocessing in " + repr(args.outfile_preprocessing))
     with open(args.outfile_preprocessing, "wb") as f:
-        np.savez(f, offset=offset, scale=scale, cutoff=cutoff, norm_factor=norm_factor)
+        np.savez(f, offset=offset, scale=scale, top_cutoff=top_cutoff, bot_cutoff=bot_cutoff, norm_factor=norm_factor)
 
 # Some pytorch action!
 import torch
@@ -195,17 +204,21 @@ X0_test = torch.Tensor(df_p0.loc[sel_test0, invars].values).float()
 X1_test = torch.Tensor(df_p1.loc[sel_test1, invars].values).float()
 
 # Transform inputs
-X0_train = torch.min(X0_train, torch.Tensor(cutoff))
+X0_train = torch.min(X0_train, torch.Tensor(top_cutoff))
+X0_train = torch.max(X0_train, torch.Tensor(bot_cutoff))
 X0_train = (X0_train - offset) / scale
 
-X1_train = torch.min(X1_train, torch.Tensor(cutoff))
+X1_train = torch.min(X1_train, torch.Tensor(top_cutoff))
+X1_train = torch.max(X1_train, torch.Tensor(bot_cutoff))
 X1_train = (X1_train - offset) / scale
 
 if args.n_folds:
-    X0_test = torch.min(X0_test, torch.Tensor(cutoff))
+    X0_test = torch.min(X0_test, torch.Tensor(top_cutoff))
+    X0_test = torch.max(X0_test, torch.Tensor(bot_cutoff))
     X0_test = (X0_test - offset) / scale
 
-    X1_test = torch.min(X1_test, torch.Tensor(cutoff))
+    X1_test = torch.min(X1_test, torch.Tensor(top_cutoff))
+    X1_test = torch.max(X1_test, torch.Tensor(bot_cutoff))
     X1_test = (X1_test - offset) / scale
 
 # Weights
@@ -269,7 +282,8 @@ with torch.no_grad():
     # Add NN to dataframes
     for df in [df_data, df_ttbar, df_non_ttbar, df_p0, df_p1]:
         X = torch.Tensor(df[invars].values).float()
-        X = torch.min(X, torch.Tensor(cutoff))
+        X = torch.min(X, torch.Tensor(top_cutoff))
+        X = torch.max(X, torch.Tensor(bot_cutoff))
         X = (X - offset) / scale
         pred = net(X).detach().numpy()
         df["nn"] = pred
