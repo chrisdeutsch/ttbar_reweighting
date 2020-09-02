@@ -28,6 +28,7 @@ parser.add_argument("--epochs", default=100, type=int,
                     help="Number of epochs. The epoch is defined as a single pass through the smallest dataset.")
 parser.add_argument("--clip-grad-value", default=None, type=float)
 parser.add_argument("--weight-decay", default=0, type=float)
+parser.add_argument("--lr-schedule-factor", default=0.95, type=float)
 
 # Sampling options
 parser.add_argument("--batch-size", default=256, type=int,
@@ -227,6 +228,7 @@ if not args.load_model:
               epochs=args.epochs,
               clip_grad_value=args.clip_grad_value,
               weight_decay=args.weight_decay,
+              lr_schedule_factor=args.lr_schedule_factor,
               train_monitor=(X0_train, W0_train, X1_train, W1_train),
               test_monitor=test_monitor
         )
