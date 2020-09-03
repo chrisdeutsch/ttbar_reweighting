@@ -79,7 +79,7 @@ for sample in dfs:
 
 # Apply selection
 for sample in dfs:
-    dfs[sample] = apply_selection(dfs[sample])
+    dfs[sample] = apply_selection(dfs[sample])#, region="VR1")
 
 # Z+HF scale factor
 for sample in ["Zee", "Zmumu", "Ztautau"]:
@@ -171,7 +171,7 @@ if args.debug:
 
 # Reproducibility
 if args.bootstrap_seed:
-    torch.manual_seel(args.bootstrap_seed + 12345)
+    torch.manual_seed(args.bootstrap_seed + 12345)
 else:
     torch.manual_seed(0)
 
