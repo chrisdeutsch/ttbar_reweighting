@@ -107,11 +107,9 @@ for df in [df_data, df_ttbar, df_non_ttbar]:
 if args.bootstrap_seed:
     log.info("Poisson bootstrap with seed: " + repr(args.bootstrap_seed))
     for i, df in enumerate([df_data, df_ttbar, df_non_ttbar]):
-        seed = i * (args.bootstrap_seed + 10)
+        seed = i * (args.bootstrap_seed + 12345)
 
         bootstrap_weights = poisson.rvs(1, size=len(df), random_state=seed).astype(np.float32)
-        bootstrap_weights *= len(df) / bootstrap_weights.sum()
-
         df["weight"] *= bootstrap_weights
 
 # Want to estimate the density ratio: f_0(x) / f_1(x) = f_(data - non_ttbar)(x) / f_(ttbar)(x)

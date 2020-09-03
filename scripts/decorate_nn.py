@@ -2,6 +2,7 @@
 import argparse
 import logging
 import sys
+import os
 
 import numpy as np
 import uproot
@@ -45,6 +46,10 @@ with uproot.open(args.ntuple) as f:
     df = f["Nominal"].pandas.df(args.variables)
 
 for label, model, preprocessing in zip(args.label, args.model, args.preprocessing):
+    if not os.path.exists(model) or not os.path.exists(preprocessing):
+        log.warning("Skipping " + label)
+        continue
+
     log.info("Loading preprocessing from: " + repr(preprocessing))
 
     f = np.load(preprocessing)
@@ -72,8 +77,8 @@ for label, model, preprocessing in zip(args.label, args.model, args.preprocessin
 
 log.info("Saving to: " + repr(args.outfile))
 with uproot.recreate(args.outfile) as f:
-    branch_dict = {l: "float32" for l in args.label}
+    branch_dict = {l: "float32" for l in args.label if l in df}
     f[args.treename] = uproot.newtree(branch_dict)
 
-    contents = {l: np.array(df[l].values) for l in args.label}
+    contents = {l: np.array(df[l].values) for l in args.label if l in df}
     f[args.treename].extend(contents)
