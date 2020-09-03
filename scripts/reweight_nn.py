@@ -170,7 +170,10 @@ if args.debug:
     ttbar_reweighting.nn.log.setLevel(logging.DEBUG)
 
 # Reproducibility
-torch.manual_seed(0)
+if args.bootstrap_seed:
+    torch.manual_seel(args.bootstrap_seed + 12345)
+else:
+    torch.manual_seed(0)
 
 # Fold selection
 sel_train0 = None
