@@ -15,6 +15,9 @@ parser.add_argument("deco_tree")
 parser.add_argument("--sel", default=None)
 parser.add_argument("--same-sign", action="store_true")
 parser.add_argument("-o", "--outfile", default="plots.root")
+
+parser.add_argument("--baseline-selection", default=None)
+parser.add_argument("--plot-weight", default="weight / tauSF")
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO)
@@ -53,7 +56,12 @@ for key, tree in trees.items():
 # Dataframes after selection
 filtered_dfs = {}
 for key, df in dfs.items():
-    filtered = df.Filter("!is_dupe && n_btag == 2 && mBB > 150000.0 && mTW > 40000.0")
+    filtered = df.Filter("!is_dupe && n_btag == 2")
+
+    if not args.baseline_selection:
+        filtered = df.Filter("mBB > 150000.0 && mTW > 40000.0")
+    else:
+        filtered = df.Filter(args.baseline_selection)
 
     if args.same_sign:
         filtered = filtered.Filter("!OS")
@@ -71,7 +79,7 @@ filtered_dfs["ttbarFake"] = filtered_dfs["ttbarIncl"].Filter("is_fake")
 # Add definitions
 for key, df in filtered_dfs.items():
     # Define weights
-    df = df.Define("weight_nosf", "weight / tauSF")
+    df = df.Define("weight_nosf", args.plot_weight)
     if "ttbar" in key:
         df = df.Define("weight_nosf_rw", "weight_nosf * rw_nominal")
         for i in range(1, 51):
@@ -83,10 +91,12 @@ for key, df in filtered_dfs.items():
     df = df.Define("njets", "n_jets")
     df = df.Define("ht", "HT / 1000.0")
     df = df.Define("mbb", "mBB / 1000.0")
+    df = df.Define("mbblo", "mBB / 1000.0")
     df = df.Define("mmc", "mMMC / 1000.0")
     df = df.Define("drtaulep", "dRTauLep")
     df = df.Define("drbb", "dRBB")
     df = df.Define("mtw", "mTW / 1000.0")
+    df = df.Define("mtwhi", "mTW / 1000.0")
     df = df.Define("met", "MET / 1000.0")
     df = df.Define("leppt", "lep_pt / 1000.0")
     df = df.Define("mhh", "mHH / 1000.0")
@@ -106,16 +116,18 @@ plots = [
     ("njets", R.RDF.TH1DModel("h_njets_proto", "", len(njets_bins) - 1, njets_bins)),
     ("ht", R.RDF.TH1DModel("h_ht_proto", "", 40, 0, 2000)),
     ("mbb", R.RDF.TH1DModel("h_mbb_proto", "", 25, 150, 650)),
-    ("mmc", R.RDF.TH1DModel("h_mmc_proto", "", 59, 60, 650)),
+    ("mbblo", R.RDF.TH1DModel("h_mbblo_proto", "", 30, 0, 150)),
+    ("mmc", R.RDF.TH1DModel("h_mmc_proto", "", 30, 60, 660)),
     ("drtaulep", R.RDF.TH1DModel("h_drtaulep_proto", "", 36, 0, 6)),
     ("drbb", R.RDF.TH1DModel("h_drbb_proto", "", 36, 0, 6)),
     ("mtw", R.RDF.TH1DModel("h_mtw_proto", "", 25, 0, 250)),
+    ("mtwhi", R.RDF.TH1DModel("h_mtwhi_proto", "", 25, 150, 400)),
     ("met", R.RDF.TH1DModel("h_met_proto", "", 20, 0, 400)),
     ("leppt", R.RDF.TH1DModel("h_leppt_proto", "", 36, 20, 200)),
     ("mhh", R.RDF.TH1DModel("h_mhh_proto", "", 36, 200, 2000)),
     ("b0pt", R.RDF.TH1DModel("h_b0pt_proto", "", 41, 45, 250)),
     ("b1pt", R.RDF.TH1DModel("h_b1pt_proto", "", 36, 20, 200)),
-    ("rnnscore", R.RDF.TH1DModel("h_rnnscore_proto", "", 50, 0., 1.))
+    ("rnnscore", R.RDF.TH1DModel("h_rnnscore_proto", "", 50, 0., 1.)),
 ]
 
 all_hists = []
