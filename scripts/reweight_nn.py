@@ -102,6 +102,7 @@ df_non_ttbar = pd.concat([dfs[sample] for sample in dfs if sample !="data" and s
 # Add new variables
 for df in [df_data, df_ttbar, df_non_ttbar]:
     df["HT_tau"] = df.HT + df.tau_pt
+    df["HT_tau_met"] = df.HT + df.tau_pt + df.MET
 
 # Adding poisson weight
 if args.bootstrap_seed:
