@@ -15,14 +15,16 @@ args = parser.parse_args()
 
 import ROOT as R
 
-model = ReweightingNet(args.num_inputs)
+model = ReweightingNet(args.num_inputs,
+                       hidden_layers=[32, 32, 32],
+                       leak=0.1)
 model.load_state_dict(torch.load(args.infile))
 
 print("Converting model:")
 print(model)
 
 f = R.TFile.Open(args.outfile, "RECREATE")
-for layername in ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"]:
+for layername in ["fc0", "fc1", "fc2", "fc3"]:
     layer = getattr(model, layername)
 
     weight = layer.weight.detach().numpy()

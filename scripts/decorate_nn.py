@@ -43,7 +43,17 @@ if len(args.label) != len(args.model) or len(args.label) != len(args.preprocessi
 
 log.info("Loading tree from: " + repr(args.ntuple))
 with uproot.open(args.ntuple) as f:
-    df = f["Nominal"].pandas.df(args.variables)
+    to_load = [var for var in args.variables if var != "HT_tau" and var != "HT_tau_met"]
+    if "HT" not in to_load:
+        to_load.append("HT")
+    if "tau_pt" not in to_load:
+        to_load.append("tau_pt")
+    if "MET" not in to_load:
+        to_load.append("MET")
+
+    df = f["Nominal"].pandas.df(to_load)
+    df["HT_tau"] = df.HT + df.tau_pt
+    df["HT_tau_met"] = df.HT_tau + df.MET
 
 for label, model, preprocessing in zip(args.label, args.model, args.preprocessing):
     if not os.path.exists(model) or not os.path.exists(preprocessing):
